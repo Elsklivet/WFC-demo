@@ -1,121 +1,75 @@
 import random
+from Tile import Tile
+from rules import pm_one, bne
 
-CHOICES = [0,1,2,3,4]
+CHOICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-class Tile:
-    def __init__(self, x, y):
-        self.choices = CHOICES.copy()
-        self.value = None
-        self.entropy = len(self.choices)
-        self.collapsed = False
-        self.x = x
-        self.y = y
-
-    def apply_rule(self, prev_value):
-        if prev_value is None:
-            return
-        if prev_value == 0:
-            if 2 in self.choices:
-                self.choices.remove(2)
-            if 3 in self.choices:
-                self.choices.remove(3)
-        elif prev_value == 1:
-            if 3 in self.choices:
-                self.choices.remove(3)
-            if 4 in self.choices:
-                self.choices.remove(4)
-        elif prev_value == 2:
-            if 2 in self.choices:
-                self.choices.remove(2)
-            if 3 in self.choices:
-                self.choices.remove(3)
-        elif prev_value == 3:
-            if 0 in self.choices:
-                self.choices.remove(0)
-            if 1 in self.choices:
-                self.choices.remove(1)
-        elif prev_value == 4:
-            if 1 in self.choices:
-                self.choices.remove(1)
-            if 2 in self.choices:
-                self.choices.remove(2)
-        self.entropy = len(self.choices)
-        if self.entropy == 1:
-            self.value = self.choices[0]
-            self.collapsed = True
-
-    def find_up(self, tilemap):
-        if self.y == 0:
-            return None
-        return tilemap[self.x][self.y-1]
-
-    def find_down(self, tilemap):
-        if self.y == len(tilemap[0])-1:
-            return None
-        return tilemap[self.x][self.y+1]
-
-    def find_left(self, tilemap):
-        if self.x == 0:
-            return None
-        return tilemap[self.x-1][self.y]
-
-    def find_right(self, tilemap):
-        if self.x == len(tilemap)-1:
-            return None
-        return tilemap[self.x+1][self.y]
-
-TILEMAP = [[Tile(x, y) for y in range(10)] for x in range(10)]
-
-def observe(tile):
+def observe(tile, tilemap):
     if tile.collapsed:
         return
     tile.collapsed = True
     tile.value = random.choice(tile.choices)
     tile.entropy = 0
-    prop_up(tile)
-    prop_down(tile)
-    prop_left(tile)
-    prop_right(tile)
+    # print(f"observed: {tile.x}, {tile.y}, collapsed to {tile.value}")
+
+    # TODO:
+    # 1. Propagate the value to the neighbors
+    # 2. find the neighbor with the lowest entropy
+    # 3. collapse that neighbor
+    prop_up(tile, tilemap)
+    prop_down(tile, tilemap)
+    prop_left(tile, tilemap)
+    prop_right(tile, tilemap)
 
 
-def prop_up(tile):
-    up = tile.find_up(TILEMAP)
+def prop_up(tile, tilemap):
+    # print(f"prop_up received: {tile.value}")
+    up = tile.find_up(tilemap)
     if up is None:
         return
     prev_value = tile.value
-    up.apply_rule(prev_value)
-    observe(up)
+    up.apply_rule(pm_one, prev_value)
+    # print(f"the upper tile is now: {up.value}")
+    observe(up, tilemap)
 
-def prop_down(tile):
-    down = tile.find_down(TILEMAP)
+def prop_down(tile, tilemap):
+    # print(f"prop_down received: {tile.value}")
+    down = tile.find_down(tilemap)
     if down is None:
         return
     prev_value = tile.value
-    down.apply_rule(prev_value)
-    observe(down)
+    down.apply_rule(pm_one, prev_value)
+    # print(f"the lower tile is now: {down.value}")
+    observe(down, tilemap)
 
-def prop_left(tile):
-    left = tile.find_left(TILEMAP)
+def prop_left(tile, tilemap):
+    # print(f"prop_left received: {tile.value}")
+    left = tile.find_left(tilemap)
     if left is None:
         return
     prev_value = tile.value
-    left.apply_rule(prev_value)
-    observe(left)
+    left.apply_rule(pm_one, prev_value)
+    # print(f"the left tile is now: {left.value}")
+    observe(left, tilemap)
 
-def prop_right(tile): 
-    right = tile.find_right(TILEMAP) 
+def prop_right(tile, tilemap): 
+    # print(f"prop_right received: {tile.value}")
+    right = tile.find_right(tilemap) 
     if right is None: 
         return
     prev_value = tile.value
-    right.apply_rule(prev_value)
-    observe(right)
-
-
-
+    right.apply_rule(pm_one, prev_value)
+    # print(f"the right tile is now: {right.value}")
+    observe(right, tilemap)
 
 
 def main():
 
+    size = 10
+
+    choices = CHOICES.copy()
+    print(choices)
+    TILEMAP = [[Tile(x, y, choices) for y in range(size)] for x in range(size)]
     tilemap = TILEMAP.copy()
 
     for x in range(len(tilemap)):
@@ -124,14 +78,12 @@ def main():
         print()
 
     start = random.choice(tilemap[random.randint(0, len(tilemap)-1)])
-    observe(start)
+    observe(start, tilemap)
 
     for x in range(len(tilemap)):
         for y in range(len(tilemap[0])):
             print(tilemap[x][y].value, end=' ')
         print()
-
-
 
 
 if __name__ == '__main__':
