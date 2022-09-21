@@ -1,5 +1,5 @@
-use rand::prelude::*;
-use rand::random;
+
+
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::Hash;
@@ -111,21 +111,18 @@ impl Tile {
     fn mod_compatibility(&mut self, just_placed_kind: TileKind) {
         match &self.kind {
             TileKind::Land => {
-                match just_placed_kind {
-                    TileKind::Coast => self.compatibility.retain(|kind| *kind != TileKind::Coast),
-                    _ => {}
+                if just_placed_kind == TileKind::Coast {
+                    self.compatibility.retain(|kind| *kind != TileKind::Coast);
                 }
             },
             TileKind::Coast => {
-                match just_placed_kind {
-                    TileKind::Sea => self.compatibility.retain(|kind| *kind != TileKind::Sea),
-                    _ => {}
+                if just_placed_kind == TileKind::Sea {
+                    self.compatibility.retain(|kind| *kind != TileKind::Sea);
                 }
             },
             TileKind::Sea => {
-                match just_placed_kind {
-                    TileKind::Coast => self.compatibility.retain(|kind| *kind != TileKind::Coast),
-                    _ => {}
+                if just_placed_kind == TileKind::Coast {
+                    self.compatibility.retain(|kind| *kind != TileKind::Coast);
                 }
             }, 
             _ => {}
@@ -196,16 +193,20 @@ fn min_entropy(world: &WorldMap) -> Option<(usize, usize)> {
         }
     }
 
-    if let Some(tile) = row_lows.iter().min() {
-        Some((tile.x, tile.y))
-    } else {
-        None
-    }
+    row_lows.iter().min().map(|tile| (tile.x, tile.y))
 }
+
+// fn get_possibilities(x: usize, y: usize, world: &WorldMap) -> HashSet<TileKind> {
+//    ...
+// }
+
+// fn calc_entropy(x: usize, y: usize) -> usize {
+//    get_possibilities(x,y).len()
+// }
 
 /// Collapse a point
 fn collapse(x: usize, y: usize, world: &mut WorldMap) {
-    let this = &mut world[x][y];
+    let _this = &mut world[x][y];
 
     // We can get the tiles in every direction from the current tile
     // by using the `find` functions. Then we want to take all of the compatibility
@@ -214,6 +215,67 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
     // choice, reset its compatibility to the default for its kind, set its entropy to max (so it is not
     // collapsed again) and set its collapsed value.
     // At that point we can return and loop should move forward.
+    
+    // Cannot do this though:
+    // choices = choices.intersection(&other.compatibilities).collect()
+    //                                                       ^--------- Cannot collect based on &TileKind to &HashSet<TileKind>
+
+    /*
+    
+    def collapse(x,y):
+        global world
+
+        get left.choices, right.choices, up.choices, down.choices
+        collapse_choices = intersect this.choices with above 
+        if not collapse_choices:
+            backtrack
+        pick random of collapse_choices
+        this.kind = above
+        this.compatibility.modify()
+    
+    def main():
+        ...
+
+        while not fully collapsed:
+            lowest = get_lowest_entropy()
+            collapse(lowest.x, lowest.y)
+    
+    */
+
+    // SCRATCH THAT, THIS MAKES MORE SENSE \/
+
+    /*
+
+    class Tile:
+        kind,
+        entropy,
+        possible_states,
+        adjacency_rules # north south east and west
+
+    def calc_entropy(x,y):
+        global world
+
+        return len(world[x][y].possible_states)
+
+    def collapse(x,y):
+        global world
+        
+        check my choices (possible_states)
+        pick a choice from my possibilities
+        collapse to this choice
+        modify my adjacency rules based on collapsed state
+        for each neighbor:
+            notify neighbor of my state change by propagating my new adjacency rules to modify their own:
+                1. entropy
+                2. possible_states
+
+    def main():
+        while not fully collapsed:
+            to_collapse = get_tile_with_lowest_entropy()
+            collapse(to_collapse)
+    */
+
+    // let choices = get_possibilities(x,y,&world);
 
 }
 
