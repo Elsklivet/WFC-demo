@@ -168,7 +168,7 @@ impl Tile {
     }
     /// Get coordinates south of me
     fn find_south(&self) -> Option<(usize, usize)> {
-        if self.y == 3 {
+        if self.y == 7 {
             None
         } else {
             Some((self.x, self.y+1))
@@ -184,7 +184,7 @@ impl Tile {
     }
     /// Get coordinates east of me
     fn find_east(&self) -> Option<(usize, usize)> {
-        if self.x == 7 {
+        if self.x == 15 {
             None
         } else {
             Some((self.x+1, self.y))
@@ -244,6 +244,7 @@ fn render_map(world: WorldMap) {
                 },
                 TileKind::Void => print!("X"),
             }
+            // Yes this is bad, no I don't care
             stdout.set_color(ColorSpec::new().set_fg(Some(Color::White)));
         }
         println!();
@@ -286,7 +287,7 @@ fn propagate(x: usize, y: usize, kind: TileKind, world: &mut WorldMap) {
     let other_comp = get_compatibility(kind);
     
     this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
-    println!("collapsed to: {:?}\nnew compatibility: {:?}", kind, this.compatibility);
+    // println!("collapsed to: {:?}\nnew compatibility: {:?}", kind, this.compatibility);
 }
 
 /// Collapse a point
@@ -403,10 +404,10 @@ fn main() {
     let mut world: WorldMap = Vec::new();
 
     // Create rows
-    for i in 0..4usize {
+    for i in 0..8usize {
         world.push(Vec::new());
 
-        for j in 0..8usize {
+        for j in 0..16usize {
             world[i].push(Tile::new(j,i, TileKind::Void));
         }
     }
@@ -415,13 +416,13 @@ fn main() {
     // Choose random spot to start
     let mut collapsed = 0;
 
-    while collapsed < 64 {
+    while collapsed < 4096 {
         // Get lowest entropy and collapse on that point
         let collapse_options = min_tiles(&world);
         let rand_index = thread_rng().gen_range(0..collapse_options.len());
         let to_collapse = collapse_options[rand_index];
 
-        println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
+        // println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
         collapse(to_collapse.x, to_collapse.y, &mut world);
         collapsed += 1;
     }
