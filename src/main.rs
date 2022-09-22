@@ -35,6 +35,10 @@ enum TileKind {
 struct Tile {
     kind: TileKind,
     compatibility: HashSet<TileKind>, // N W E S 
+    options: HashSet<TileKind>, // L, C, S, (V?)
+    // options is what self can be
+    // compatibility is what self can be next to
+    // self modifies options of neighbors based on compatibility
     entropy: usize,
     collapsed: bool,
     x: usize,
@@ -45,6 +49,9 @@ struct Tile {
 fn get_compatibility(kind: TileKind) -> HashSet<TileKind> {
     let mut compatibility: HashSet<TileKind> = HashSet::new();
 
+    // We are generating the hashset AFTER we know what kind of tile this is
+    // which in reality every tile starts as a void tile
+    // so we collapse, get the compatibility, and then propagate
     match kind {
         TileKind::Land => {
             compatibility.insert(TileKind::Land);
@@ -95,10 +102,12 @@ impl Tile {
     fn new(x: usize, y: usize, kind: TileKind) -> Tile {
         let compatibility = get_compatibility(kind);
         let entropy = compatibility.len();
+        let options = compatibility.clone();
 
         Tile {
             kind,
             compatibility,
+            options,
             entropy,
             collapsed: false,
             x,
@@ -108,6 +117,7 @@ impl Tile {
 
     /// Modify the compatibility matrix for the Tile based on the kind of tile
     /// that was just placed.
+    /// lets not worry about this for now
     fn mod_compatibility(&mut self, just_placed_kind: TileKind) {
         match &self.kind {
             TileKind::Land => {
@@ -216,9 +226,21 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
     // collapsed again) and set its collapsed value.
     // At that point we can return and loop should move forward.
     
+    // Get the tiles in every direction
+    let _east = _this.find_east();
+    let _west = _this.find_west();
+    let _north = _this.find_north();
+    let _south = _this.find_south();
+
+    // Get the compatibility sets for each tile
+    
     // Cannot do this though:
     // choices = choices.intersection(&other.compatibilities).collect()
     //                                                       ^--------- Cannot collect based on &TileKind to &HashSet<TileKind>
+    
+    // I dk how exactly /\ is failing, maybe try this:
+    // choices = choices.intersection(&other.compatibilities).map(|kind| kind.clone()).collect();
+
 
     /*
     
