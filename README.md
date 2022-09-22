@@ -2,6 +2,13 @@
 
 Demonstration of basic use of wave function collapse for explanatory purposes.
 
+## Version 2.1.1(side quest)
+
+### what's new
+- rulegen.py:
+    - generate adjacency rules based on input array
+
+
 ## Version 2.1(in pregress)
 
 ### what's new
