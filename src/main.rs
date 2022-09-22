@@ -404,11 +404,11 @@ fn main() {
     let mut world: WorldMap = Vec::new();
 
     // Create rows
-    for i in 0..8usize {
+    for y in 0..8usize {
         world.push(Vec::new());
 
-        for j in 0..16usize {
-            world[i].push(Tile::new(j,i, TileKind::Void));
+        for x in 0..16usize {
+            world[y].push(Tile::new(x,y, TileKind::Void));
         }
     }
 
@@ -416,7 +416,7 @@ fn main() {
     // Choose random spot to start
     let mut collapsed = 0;
 
-    while collapsed < 4096 {
+    while collapsed < 1024 {
         // Get lowest entropy and collapse on that point
         let collapse_options = min_tiles(&world);
         let rand_index = thread_rng().gen_range(0..collapse_options.len());
