@@ -3,6 +3,7 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::Hash;
+use rand::prelude::*;
 
 // wikihow to backtrack
 // void traverse(decision, partial_solution):
@@ -22,26 +23,33 @@ use std::hash::Hash;
 /// - Land can be placed next to land or coast, but coast only once
 /// - Coast can be placed next to land, coast, or sea, but sea only once
 /// - Sea can be placed next to sea or coast, but coast only once
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum TileKind {
     Land,
     Coast,
     Sea,
-    Void, // This is just to represent "we don't have a tile here"
+    Void, // This is just to represent "we don't have a tile here yet"
 }
 
 /// Tile structure
 #[derive(Clone)]
 struct Tile {
+    /// Type of tile this tile is
     kind: TileKind,
-    compatibility: HashSet<TileKind>, // N W E S 
-    options: HashSet<TileKind>, // L, C, S, (V?)
-    // options is what self can be
-    // compatibility is what self can be next to
-    // self modifies options of neighbors based on compatibility
+    /// The (omnidirectional) set of possibilities for this tile's neighbors
+    compatibility: HashSet<TileKind>, // L, C, S, (V?)
+    /// Set of choices for superposition states<br>
+    /// Modified by our neighbors in collapse to shrink our
+    /// potential states to ones that fit their compatibilities.
+    choices: HashSet<TileKind>, // L, C, S, (V?)
+    /// The entropy (number of possible states) of this tile
+    /// At any given time, must be equal to choices.len()
     entropy: usize,
+    /// Has this tile been collapsed into a single state
     collapsed: bool,
+    /// Horizontal coordinate of the tile, left to right
     x: usize,
+    /// Vertical coordinate of the tile, top to bottom
     y: usize,
 }
 
@@ -76,6 +84,10 @@ fn get_compatibility(kind: TileKind) -> HashSet<TileKind> {
     compatibility
 }
 
+fn default_choices() -> HashSet<TileKind> {
+    HashSet::from([TileKind::Sea, TileKind::Land, TileKind::Coast])
+}
+
 impl PartialOrd for Tile {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
@@ -101,13 +113,13 @@ impl Tile {
     /// Generate a new Tile
     fn new(x: usize, y: usize, kind: TileKind) -> Tile {
         let compatibility = get_compatibility(kind);
-        let entropy = compatibility.len();
-        let options = compatibility.clone();
+        let choices = default_choices();
+        let entropy = choices.len();
 
         Tile {
             kind,
             compatibility,
-            options,
+            choices,
             entropy,
             collapsed: false,
             x,
@@ -118,27 +130,27 @@ impl Tile {
     /// Modify the compatibility matrix for the Tile based on the kind of tile
     /// that was just placed.
     /// lets not worry about this for now
-    fn mod_compatibility(&mut self, just_placed_kind: TileKind) {
-        match &self.kind {
-            TileKind::Land => {
-                if just_placed_kind == TileKind::Coast {
-                    self.compatibility.retain(|kind| *kind != TileKind::Coast);
-                }
-            },
-            TileKind::Coast => {
-                if just_placed_kind == TileKind::Sea {
-                    self.compatibility.retain(|kind| *kind != TileKind::Sea);
-                }
-            },
-            TileKind::Sea => {
-                if just_placed_kind == TileKind::Coast {
-                    self.compatibility.retain(|kind| *kind != TileKind::Coast);
-                }
-            }, 
-            _ => {}
-        }
-    }
-
+    // fn mod_compatibility(&mut self, just_placed_kind: TileKind) {
+    //     match &self.kind {
+    //         TileKind::Land => {
+    //             if just_placed_kind == TileKind::Coast {
+    //                 self.compatibility.retain(|kind| *kind != TileKind::Coast);
+    //             }
+    //         },
+    //         TileKind::Coast => {
+    //             if just_placed_kind == TileKind::Sea {
+    //                 self.compatibility.retain(|kind| *kind != TileKind::Sea);
+    //             }
+    //         },
+    //         TileKind::Sea => {
+    //             if just_placed_kind == TileKind::Coast {
+    //                 self.compatibility.retain(|kind| *kind != TileKind::Coast);
+    //             }
+    //         }, 
+    //         _ => {}
+    //     }
+    // }
+    // Get coordinates north of me
     fn find_north(&self) -> Option<(usize, usize)> {
         if self.y == 0 {
             None
@@ -146,15 +158,15 @@ impl Tile {
             Some((self.x, self.y-1))
         }
     }
-
+    /// Get coordinates south of me
     fn find_south(&self) -> Option<(usize, usize)> {
-        if self.y == 7 {
+        if self.y == 3 {
             None
         } else {
             Some((self.x, self.y+1))
         }
     }
-
+    /// Get coordinates west of me
     fn find_west(&self) -> Option<(usize, usize)> {
         if self.x == 0 {
             None
@@ -162,13 +174,40 @@ impl Tile {
             Some((self.x-1, self.y))
         }
     }
-
+    /// Get coordinates east of me
     fn find_east(&self) -> Option<(usize, usize)> {
-        if self.x == 15 {
+        if self.x == 7 {
             None
         } else {
             Some((self.x+1, self.y))
         }
+    }
+    /// Collapse this tile into a single state.
+    /// 
+    /// **Warning:** Function assumes that the current selection of `choices` is correct. 
+    /// # Steps
+    /// 1. Randomly select from `choices` a TileKind for this tile
+    /// 2. Mark this tile as collapsed
+    /// 3. Modify our own compatibility set based on our new `kind`
+    /// 4. Report the TileKind selected back to the iterative `collapse` function to propagate to 
+    /// our neighbors
+    /// 
+    /// ## Returns
+    /// - `TileKind` this tile was collapsed to
+    fn collapse_self(&mut self) -> TileKind  {
+        // Step 1
+        let choice = thread_rng().gen_range(0..self.choices.len());
+        let state = self.choices.iter().nth(choice).unwrap_or(&TileKind::Void).clone();
+        self.kind = state;
+
+        // Step 2
+        self.collapsed = true;
+
+        // Step 3
+        // self.compatibility = get_compatibility(self.kind);
+
+        // Step 4
+        self.kind
     }
 
 }
@@ -191,19 +230,25 @@ fn render_map(world: WorldMap) {
 }
 
 /// Find the min entropy tile
-fn min_entropy(world: &WorldMap) -> Option<(usize, usize)> {
-    let mut row_lows: Vec<Tile> = vec![];
-    for row in world {
-        let low = row.iter().min();
-        if let Some(tile) = low {
-            row_lows.push(tile.clone());
-        } else {
-            // Something seriously wrong
-            return None;
-        }
+fn min_entropy(world: &WorldMap) -> usize {
+    match world.iter().flat_map(|row| row.iter()).min() {
+        Some(tile) => tile.entropy,
+        None => usize::MAX,
     }
+}
 
-    row_lows.iter().min().map(|tile| (tile.x, tile.y))
+fn min_tiles(world: &WorldMap) -> Vec<&Tile> {
+    // Get lowest entropy value
+    let entropy = min_entropy(world);
+    let choices: Vec<&Tile> = Vec::new();
+
+    // Check if it returned a valid value or not
+    if entropy == usize::MAX {
+        // No minimum was found, return every single tile
+        world.iter().flat_map(|row| row.iter()).collect()
+    } else {
+        world.iter().flat_map(|row| row.iter()).filter(|tile| tile.entropy == entropy).collect()
+    }
 }
 
 // fn get_possibilities(x: usize, y: usize, world: &WorldMap) -> HashSet<TileKind> {
@@ -214,9 +259,22 @@ fn min_entropy(world: &WorldMap) -> Option<(usize, usize)> {
 //    get_possibilities(x,y).len()
 // }
 
+/// Propagate rule changes to neighbors
+fn propagate(x: usize, y: usize, kind: TileKind, world: &mut WorldMap) {
+    let this = &mut world[y][x];
+    let other_comp = get_compatibility(kind);
+    
+    this.compatibility = this.compatibility.intersection(&other_comp).map(|kind| kind.clone()).collect();
+    println!("new compatibility: {:?}", this.compatibility);
+}
+
 /// Collapse a point
 fn collapse(x: usize, y: usize, world: &mut WorldMap) {
-    let _this = &mut world[x][y];
+    let this = &mut world[y][x];
+
+    if this.collapsed {
+        return;
+    }
 
     // We can get the tiles in every direction from the current tile
     // by using the `find` functions. Then we want to take all of the compatibility
@@ -225,12 +283,29 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
     // choice, reset its compatibility to the default for its kind, set its entropy to max (so it is not
     // collapsed again) and set its collapsed value.
     // At that point we can return and loop should move forward.
+
+    let this_kind = this.collapse_self();
     
     // Get the tiles in every direction
-    let _east = _this.find_east();
-    let _west = _this.find_west();
-    let _north = _this.find_north();
-    let _south = _this.find_south();
+    let wrapped_east = this.find_east();
+    let wrapped_west = this.find_west();
+    let wrapped_north = this.find_north();
+    let wrapped_south = this.find_south();
+    
+    if let Some(east) = wrapped_east {
+        propagate(east.0, east.1, this_kind, world);
+    }
+    if let Some(west) = wrapped_west {
+        propagate(west.0, west.1, this_kind, world);
+    }
+    if let Some(north) = wrapped_north{
+        propagate(north.0, north.1, this_kind, world);
+    }
+    if let Some(south) = wrapped_south{
+        propagate(south.0, south.1, this_kind, world);
+    }
+
+
 
     // Get the compatibility sets for each tile
     
@@ -301,15 +376,16 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
 
 }
 
+
 fn main() {
     // World will be a 8x16 vector of vectors of tiles
     let mut world: WorldMap = Vec::new();
 
     // Create rows
-    for i in 0..8usize {
+    for i in 0..4usize {
         world.push(Vec::new());
 
-        for j in 0..16usize {
+        for j in 0..8usize {
             world[i].push(Tile::new(j,i, TileKind::Void));
         }
     }
@@ -318,15 +394,14 @@ fn main() {
     // Choose random spot to start
     let mut collapsed = 0;
 
-    while collapsed < 128 {
+    while collapsed < 64 {
         // Get lowest entropy and collapse on that point
-        if let Some(lowest_coord) = min_entropy(&world) {
-            collapse(lowest_coord.0, lowest_coord.1, &mut world);
-            collapsed += 1;
-        } else {
-            println!("Something went wrong finding minimum entropy.");
-            break;
-        }
+        let collapse_options = min_tiles(&world);
+        let rand_index = thread_rng().gen_range(0..collapse_options.len());
+        let to_collapse = collapse_options[rand_index];
+        println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
+        collapse(to_collapse.x, to_collapse.y, &mut world);
+        collapsed += 1;
     }
     
     render_map(world);
