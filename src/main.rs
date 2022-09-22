@@ -4,6 +4,10 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::hash::Hash;
 use rand::prelude::*;
+use std::io::Write;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
+
 
 // wikihow to backtrack
 // void traverse(decision, partial_solution):
@@ -114,7 +118,11 @@ impl Tile {
     fn new(x: usize, y: usize, kind: TileKind) -> Tile {
         let compatibility = get_compatibility(kind);
         let choices = default_choices();
-        let entropy = choices.len();
+        let entropy = if kind != TileKind::Void {
+            choices.len()
+        } else {
+            0
+        };
 
         Tile {
             kind,
@@ -216,14 +224,27 @@ type WorldMap = Vec<Vec<Tile>>;
 
 /// Simply print the world out as it currently stands.
 fn render_map(world: WorldMap) {
+    let mut stdout = StandardStream::stdout(ColorChoice::Always);
     for row in world {
         for tile in row {
             match tile.kind {
-                TileKind::Land => print!("L"),
-                TileKind::Coast => print!("C"),
-                TileKind::Sea => print!("S"),
+                TileKind::Land => {
+                    match stdout.set_color(ColorSpec::new().set_fg(Some(Color::Green))) {
+                        Ok(()) => write!(&mut stdout, "L").expect("ability to write to term"),
+                        Err(_) => print!("L"),
+                    };
+                },
+                TileKind::Coast => match stdout.set_color(ColorSpec::new().set_fg(Some(Color::Yellow))) {
+                    Ok(()) => write!(&mut stdout, "C").expect("ability to write to term"),
+                    Err(_) => print!("C"),
+                },
+                TileKind::Sea => match stdout.set_color(ColorSpec::new().set_fg(Some(Color::Blue))) {
+                    Ok(()) => write!(&mut stdout, "S").expect("ability to write to term"),
+                    Err(_) => print!("S"),
+                },
                 TileKind::Void => print!("X"),
             }
+            stdout.set_color(ColorSpec::new().set_fg(Some(Color::White)));
         }
         println!();
     }
@@ -264,8 +285,8 @@ fn propagate(x: usize, y: usize, kind: TileKind, world: &mut WorldMap) {
     let this = &mut world[y][x];
     let other_comp = get_compatibility(kind);
     
-    this.compatibility = this.compatibility.intersection(&other_comp).map(|kind| kind.clone()).collect();
-    println!("new compatibility: {:?}", this.compatibility);
+    this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
+    println!("collapsed to: {:?}\nnew compatibility: {:?}", kind, this.compatibility);
 }
 
 /// Collapse a point
@@ -399,10 +420,17 @@ fn main() {
         let collapse_options = min_tiles(&world);
         let rand_index = thread_rng().gen_range(0..collapse_options.len());
         let to_collapse = collapse_options[rand_index];
+
         println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
         collapse(to_collapse.x, to_collapse.y, &mut world);
         collapsed += 1;
     }
+
+    // for row in world.clone() {
+    //     for tile in row {
+    //         collapse(tile.x, tile.y, &mut world);
+    //     }
+    // }
     
     render_map(world);
 }
