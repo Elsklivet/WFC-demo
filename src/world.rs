@@ -1,3 +1,7 @@
+use crate::StandardStream;
+use crate::ColorChoice;
+use crate::ColorSpec;
+
 pub struct WorldMap{
     pub width: usize,
     pub height: usize,
