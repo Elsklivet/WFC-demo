@@ -1,6 +1,7 @@
-use crate::StandardStream;
-use crate::ColorChoice;
-use crate::ColorSpec;
+use std::io::Write;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use crate::tile::{Tile, TileKind};
+
 
 pub struct WorldMap{
     pub width: usize,
@@ -15,7 +16,7 @@ impl WorldMap{
             world.push(Vec::new());
     
             for x in 0..width{
-                world[y].push(Tile::new(x,y, TileKind::Void));
+                world[y].push(Tile::new(x,y, TileKind::Void, width, height));
             }
         }
 
@@ -26,9 +27,9 @@ impl WorldMap{
         }
     }
 
-    fn render_map(&self) {
+    pub fn render_map(&self) {
         let mut stdout = StandardStream::stdout(ColorChoice::Always);
-        for row in self.world {
+        for row in &self.world {
             for tile in row {
                 match tile.kind {
                     TileKind::Land => {
