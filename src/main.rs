@@ -4,6 +4,7 @@ mod tile;
 use rand::prelude::*;
 use tile::{Tile, TileKind, get_compatibility};
 use world::WorldMap;
+use std::time::SystemTime;
 // use rulegen::generate_rules;
 
 // wikihow to backtrack
@@ -16,7 +17,6 @@ use world::WorldMap;
 //     else:
 //       candidate solution
 //     undo choice
-
 
 
 /// Kind of tile.
@@ -187,13 +187,16 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
 
 fn main() {
     // World will be a 8x16 vector of vectors of tiles
-    let mut world = WorldMap::new(80, 40);
+    let width = 80;
+    let height = 45;
+    let mut world = WorldMap::new(width, height);
 
     // Start collapsing
     // Choose random spot to start
     let mut collapsed = 0;
 
-    while collapsed < 3200 {
+    let start = SystemTime::now();
+    while collapsed < width * height {
         // Get lowest entropy and collapse on that point
         let collapse_options = min_tiles(&world);
         // println!("Collapse options: {:?}", collapse_options);
@@ -215,4 +218,8 @@ fn main() {
     // }
     
     world.render_map();
+    let end = SystemTime::now();
+    let duration = end.duration_since(start).unwrap();
+    println!("Generated a {} * {} map, it took {} seconds", width, height, duration.as_secs());
+
 }
