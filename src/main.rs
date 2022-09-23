@@ -27,16 +27,28 @@ use world::WorldMap;
 
 /// Find the min entropy tile
 fn min_entropy(world: &WorldMap) -> usize {
-    match world.world.iter().flat_map(|row| row.iter()).min() {
-        Some(tile) => tile.entropy,
-        None => usize::MAX,
+    // loop over the world
+    let mut min_entropy = usize::MAX;
+    for row in world.world.iter() {
+        for tile in row {
+            if tile.entropy < min_entropy && !tile.collapsed {
+                min_entropy = tile.entropy;
+            }
+        }
     }
+    min_entropy
+    // match world.world.iter().flat_map(|row| row.iter()).min() {
+    //     Some(tile) => tile.entropy,
+    //     None => usize::MAX,
+    // }
 }
 
 fn min_tiles(world: &WorldMap) -> Vec<&Tile> {
     // Get lowest entropy value
     let entropy = min_entropy(world);
-    let choices: Vec<&Tile> = Vec::new();
+    // println!("Entropy: {}", entropy);
+    // ^ This line says entrypy 0, that should not happen.
+    let _choices: Vec<&Tile> = Vec::new();
 
     // Check if it returned a valid value or not
     if entropy == usize::MAX {
@@ -175,17 +187,21 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
 
 fn main() {
     // World will be a 8x16 vector of vectors of tiles
-    let mut world = WorldMap::new(32, 32);
+    let mut world = WorldMap::new(80, 40);
 
     // Start collapsing
     // Choose random spot to start
     let mut collapsed = 0;
 
-    while collapsed < 1024 {
+    while collapsed < 3200 {
         // Get lowest entropy and collapse on that point
         let collapse_options = min_tiles(&world);
+        // println!("Collapse options: {:?}", collapse_options);
         let rand_index = thread_rng().gen_range(0..collapse_options.len());
+        // println!("Collapse_options len: {}", collapse_options.len());
+        // println!("Random index: {}", rand_index);
         let to_collapse = collapse_options[rand_index];
+        // println!("To collapse: {}, {}", to_collapse.x, to_collapse.y);
 
         // println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
         collapse(to_collapse.x, to_collapse.y, &mut world);

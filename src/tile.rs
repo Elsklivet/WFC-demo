@@ -12,7 +12,7 @@ pub enum TileKind {
 }
 
 /// Tile structure
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Tile {
     /// Type of tile this tile is
     pub kind: TileKind,
@@ -98,11 +98,13 @@ impl Tile {
     pub fn new(x: usize, y: usize, kind: TileKind, world_width: usize, world_height: usize) -> Tile {
         let compatibility = get_compatibility(kind);
         let choices = default_choices();
-        let entropy = if kind != TileKind::Void {
-            choices.len()
-        } else {
-            0
-        };
+        let entropy = choices.len();
+        // let entropy = if kind != TileKind::Void {
+        //     choices.len()
+        // }
+        // else {
+        //     usize::MAX
+        // };
 
         Tile {
             kind,
@@ -195,6 +197,7 @@ impl Tile {
 
         // Step 3
         // self.compatibility = get_compatibility(self.kind);
+        self.entropy = usize::MAX;
 
         // Step 4
         self.kind
