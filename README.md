@@ -15,7 +15,6 @@ fn main{
     /// 3. pipe the rules into tiles
     /// 4. generate the world with "knowledgeable" tiles
     /// 5. while loop that does the collapse
-    /// our current collapse efficiency is still 1/10 ish
     ///        /\
     /// awaiting further discussion
 }
