@@ -175,7 +175,7 @@ fn collapse(x: usize, y: usize, world: &mut WorldMap) {
 
 fn main() {
     // World will be a 8x16 vector of vectors of tiles
-    let mut world = WorldMap::new(8, 16);
+    let mut world = WorldMap::new(32, 32);
 
     // Start collapsing
     // Choose random spot to start
