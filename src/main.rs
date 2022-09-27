@@ -1,7 +1,3 @@
-// mod Tile;
-// mod TileKind;
-// mod rulegen;
-// mod WorldMap;
 use std::env;
 use std::{fs::File, io::Read};
 use std::collections::{HashMap, HashSet};
@@ -26,18 +22,26 @@ fn main() {
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
 
+    println!("content.len() = {}", contents.len());
+
+    let input_board: Vec<Vec<char>> = contents.lines().map(|l| l.chars().collect()).collect();
+    println!("input_board.len() = {}", input_board.len());
+    println!("input_board[0].len() = {}", input_board[0].len());
+    let input_width = input_board[0].len();
+    let input_height = input_board.len();
+
     // println!("{:?}", contents);
     // go into the string once to give each unique char an id
     let mut charmap = HashMap::new();
     let mut id = 1; // 0 is reserved for superposition
-    for c in contents.chars() {
+    for c in input_board.iter().flat_map(|l| l.iter()) {
         if !charmap.contains_key(&c) {
             charmap.insert(c, id);
             id += 1;
         }
     }
     // manually add the superposition char
-    charmap.insert('X', 0);
+    charmap.insert(&'X', 0);
     println!("{:?}", charmap);
 
     // make a lookup table for the charmap
@@ -46,23 +50,23 @@ fn main() {
         charmap_lookup.insert(v, k);
     }
     // mannually add the superposition char
-    charmap_lookup.insert(&0, &'X');
-    // println!("{:?}", charmap_lookup);
+    charmap_lookup.insert(&0, &&'X');
+    println!("{:?}", charmap_lookup);
 
     // now represent the input as numbers
-    for i in 0..10{
-        for j in 0..10{
-            let c = contents.chars().nth(i*10+j).unwrap();
+    for i in 0..input_board.len() {
+        for j in 0..input_board[i].len() {
+            let c = input_board[i][j];
             print!("{:?}-", charmap.get(&c).unwrap());
         }
         println!("");
     }
 
     // make a 2d int array
-    let mut map = [[0; 10]; 10];
-    for i in 0..10{
-        for j in 0..10{
-            let c = contents.chars().nth(i*10+j).unwrap();
+    let mut map = vec![vec![0; input_width]; input_height];
+    for i in 0..input_board.len() {
+        for j in 0..input_board[i].len() {
+            let c = input_board[i][j];
             map[i][j] = *charmap.get(&c).unwrap();
         }
     }
@@ -70,8 +74,8 @@ fn main() {
 
     // go into the int array and make a rule set
     let mut rules: HashMap<usize, HashMap<Dir, HashSet<usize>>> = HashMap::new();
-    for i in 0..10{
-        for j in 0..10{
+    for i in 0..map.len(){
+        for j in 0..map[i].len(){
             rules 
             .entry(map[i][j])
             .or_insert(HashMap::from([
@@ -85,8 +89,8 @@ fn main() {
     // println!("{:?}", rules);
 
     // now go through the map and fill in the rules
-    for i in 0..10{
-        for j in 0..10{
+    for i in 0..map.len(){
+        for j in 0..map[i].len(){
             // North
             if i > 0{
                 rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::NORTH).unwrap().insert(map[i-1][j]);
@@ -200,7 +204,8 @@ fn min_tiles(world: &Vec<Vec<Tile>>) -> Vec<&Tile> {
 // and use that specific rule set
 fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut Vec<Vec<Tile>>){
 
-    let this = &mut world[x][y];
+    let this = &mut world[y][x];
+    println!("this's original choices: {:?}", this.choices);
     let other_comp = rule;
     
     this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
@@ -212,7 +217,15 @@ fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut Vec<Vec<Tile
 fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>, 
     rule: &HashMap<usize, HashMap<Dir, HashSet<usize>>>){
 
-    let this = &mut world[x][y];
+    // print intermediate world
+    // for i in 0..world.len(){
+    //     for j in 0..world[0].len(){
+    //         print!("{:}", world[i][j].kind);
+    //     }
+    //     println!("");
+    // }
+
+    let this = &mut world[y][x];
 
     if this.collapsed {
         return;
@@ -220,7 +233,7 @@ fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>,
 
     let this_kind = this.collapse_self();
 
-    println!("collapsing tile at {}, {} to kind {:?}", x, y, this_kind);
+    println!("collapsing tile at {}, {} to kind {:?}", y, x, this_kind);
 
     let this_rule = rule.get(&this_kind).unwrap();
 
@@ -233,16 +246,24 @@ fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>,
     let wrapped_south = this.find_south();
     
     if let Some(east) = wrapped_east {
-        propagate(east.0, east.1, this_rule.get(&Dir::EAST).unwrap(), world);
+        let east_rule = this_rule.get(&Dir::EAST).unwrap();
+        println!("East:");
+        propagate(east.0, east.1, east_rule, world);
     }
     if let Some(west) = wrapped_west {
-        propagate(west.0, west.1, this_rule.get(&Dir::WEST).unwrap(), world);
+        let west_rule = this_rule.get(&Dir::WEST).unwrap();
+        println!("West:");
+        propagate(west.0, west.1, west_rule, world);
     }
     if let Some(north) = wrapped_north{
-        propagate(north.0, north.1, this_rule.get(&Dir::NORTH).unwrap(), world);
+        let north_rule = this_rule.get(&Dir::NORTH).unwrap();
+        println!("North:");
+        propagate(north.0, north.1, north_rule, world);
     }
     if let Some(south) = wrapped_south{
-        propagate(south.0, south.1, this_rule.get(&Dir::SOUTH).unwrap(), world);
+        let south_rule = this_rule.get(&Dir::SOUTH).unwrap();
+        println!("South:");
+        propagate(south.0, south.1, south_rule, world);
     }
 
 }
