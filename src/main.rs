@@ -36,6 +36,8 @@ fn main() {
             id += 1;
         }
     }
+    // manually add the superposition char
+    charmap.insert('X', 0);
     println!("{:?}", charmap);
 
     // make a lookup table for the charmap
@@ -128,7 +130,7 @@ fn main() {
         // println!("Collapse_options len: {}", collapse_options.len());
         // println!("Random index: {}", rand_index);
         let to_collapse = collapse_options[rand_index];
-        // println!("To collapse: {}, {}", to_collapse.x, to_collapse.y);
+        println!("main loop chose this to collapse: {}, {}", to_collapse.x, to_collapse.y);
 
         // println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
         collapse(to_collapse.x, to_collapse.y, &mut world, &rules);
@@ -138,7 +140,7 @@ fn main() {
     // print the world
     for i in 0..world_height{
         for j in 0..world_width{
-            print!("{:?}", charmap_lookup.get(&world[i][j].kind).unwrap());
+            print!("{:}", charmap_lookup.get(&world[i][j].kind).unwrap());
         }
         println!("");
     }
@@ -168,11 +170,10 @@ fn min_entropy(world: &Vec<Vec<Tile>>) -> usize {
             }
         }
     }
+
+    println!("min entropy: {}", min_entropy);
+
     min_entropy
-    // match world.world.iter().flat_map(|row| row.iter()).min() {
-    //     Some(tile) => tile.entropy,
-    //     None => usize::MAX,
-    // }
 }
 
 fn min_tiles(world: &Vec<Vec<Tile>>) -> Vec<&Tile> {
@@ -187,7 +188,9 @@ fn min_tiles(world: &Vec<Vec<Tile>>) -> Vec<&Tile> {
         // No minimum was found, return every single tile
         world.iter().flat_map(|row| row.iter()).collect()
     } else {
-        world.iter().flat_map(|row| row.iter()).filter(|tile| tile.entropy() == entropy).collect()
+        let choices = world.iter().flat_map(|row| row.iter()).filter(|tile| tile.entropy() == entropy).collect();
+        println!("Choices: {:?}", choices);
+        choices
     }
 }
 
@@ -197,10 +200,11 @@ fn min_tiles(world: &Vec<Vec<Tile>>) -> Vec<&Tile> {
 // and use that specific rule set
 fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut Vec<Vec<Tile>>){
 
-    let this = &mut world[y][x];
+    let this = &mut world[x][y];
     let other_comp = rule;
     
     this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
+    println!("Propagating to {}, {}, choices: {:?}", x, y, this.choices);
 
 }
 
@@ -208,7 +212,7 @@ fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut Vec<Vec<Tile
 fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>, 
     rule: &HashMap<usize, HashMap<Dir, HashSet<usize>>>){
 
-    let this = &mut world[y][x];
+    let this = &mut world[x][y];
 
     if this.collapsed {
         return;
@@ -216,9 +220,11 @@ fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>,
 
     let this_kind = this.collapse_self();
 
-    println!("{} {} {:?}", x, y, this_kind);
+    println!("collapsing tile at {}, {} to kind {:?}", x, y, this_kind);
 
     let this_rule = rule.get(&this_kind).unwrap();
+
+    println!("this rule: {:?}", this_rule);
     
     // Get the tiles in every direction
     let wrapped_east = this.find_east();
@@ -291,10 +297,9 @@ impl Tile{
         // Step 2
         self.collapsed = true;
 
-        // Step 3
-        // self.compatibility = get_compatibility(self.kind);
+        println!("Self-collapsed tile at {}, {} to kind {:?}", self.x, self.y, self.kind);
 
-        // Step 4
+        // Step 3
         self.kind
     }
 
