@@ -62,7 +62,7 @@ fn main() {
         println!("");
     }
 
-    // make a 2d int array
+    // make a 2d int array so our tiles can be represented as numbers
     let mut map = vec![vec![0; input_width]; input_height];
     for i in 0..input_board.len() {
         for j in 0..input_board[i].len() {
@@ -96,7 +96,7 @@ fn main() {
                 rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::WEST).unwrap().insert(map[i-1][j]);
             }
             // East
-            if i < 9{
+            if i < map.len()-1{
                 rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::EAST).unwrap().insert(map[i+1][j]);
             }
             // North
@@ -104,53 +104,47 @@ fn main() {
                 rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::NORTH).unwrap().insert(map[i][j-1]);
             }
             // South
-            if j < 9{
+            if j < map[i].len()-1{
                 rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::SOUTH).unwrap().insert(map[i][j+1]);
             }
         }
     }
+
+    //---------------------------------------------------------------------------------------------------------
+    // RULEGEN COMPLETE
+
+
     // println!("{:?}", rules.entry(0));
     let world_width = args[1].parse::<usize>().unwrap();
     let world_height = args[2].parse::<usize>().unwrap();
 
-    let mut world: Vec<Vec<Tile>> = Vec::new();
-    for y in 0..world_height{
-        let mut row: Vec<Tile> = Vec::new();
-        for x in 0..world_width{
-            row.push(Tile::new(x, y, world_width, world_height));
-        }
-        world.push(row);
-    }
+    let mut world: WorldMap = WorldMap::new(world_width, world_height);
 
     // println!("{:?}", world);
 
+    let mut world_recorder: Vec<&WorldMap> = Vec::new();
     // collapse the world
     let mut collapsed = 0;
     while collapsed < world_width * world_height{
-        // Get lowest entropy and collapse on that point
-        let collapse_options = min_tiles(&world);
-        // println!("Collapse options: {:?}", collapse_options);
-        let rand_index = thread_rng().gen_range(0..collapse_options.len());
-        // println!("Collapse_options len: {}", collapse_options.len());
-        // println!("Random index: {}", rand_index);
-        let to_collapse = collapse_options[rand_index];
-        println!("main loop chose this to collapse: {}, {}", to_collapse.x, to_collapse.y);
 
+        let mut prev_world = world.clone();
         // println!("collapsing tile at {}, {}, this is the {} collapse", to_collapse.y, to_collapse.x, collapsed);
-        collapse(to_collapse.x, to_collapse.y, &mut world, &rules);
-        collapsed += 1;
+        match collapse(&mut world, &rules){
+            Ok(v) => {
+                collapsed += 1;
+                world_recorder.push(&prev_world);
+            }
+            Err(_) => println!("Error collapsing tile"),
+        }
     }
 
     // print the world
     for i in 0..world_height{
         for j in 0..world_width{
-            print!("{:}", charmap_lookup.get(&world[i][j].kind).unwrap());
+            print!("{:}", charmap_lookup.get(&world.get_tile(i, j).kind).unwrap());
         }
         println!("");
     }
-
-
-
 
 }
 
@@ -163,111 +157,6 @@ enum Dir {
     SOUTH,
 }
 
-/// Find the min entropy tile
-fn min_entropy(world: &Vec<Vec<Tile>>) -> usize {
-    // loop over the world
-    let mut min_entropy = usize::MAX;
-    for row in world.iter() {
-        for tile in row {
-            if tile.entropy() < min_entropy && !tile.collapsed {
-                min_entropy = tile.entropy();
-            }
-        }
-    }
-
-    println!("min entropy: {}", min_entropy);
-
-    min_entropy
-}
-
-fn min_tiles(world: &Vec<Vec<Tile>>) -> Vec<&Tile> {
-    // Get lowest entropy value
-    let entropy = min_entropy(world);
-    // println!("Entropy: {}", entropy);
-    // ^ This line says entrypy 0, that should not happen.
-    let _choices: Vec<&Tile> = Vec::new();
-
-    // Check if it returned a valid value or not
-    if entropy == usize::MAX {
-        // No minimum was found, return every single tile
-        world.iter().flat_map(|row| row.iter()).collect()
-    } else {
-        let choices = world.iter().flat_map(|row| row.iter()).filter(|tile| tile.entropy() == entropy).collect();
-        println!("Choices: {:?}", choices);
-        choices
-    }
-}
-
-// before we call propagate
-// we already know which neighbor we are prpagating to
-// so we index into the rule set
-// and use that specific rule set
-fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut Vec<Vec<Tile>>){
-
-    let this = &mut world[y][x];
-    println!("this's original choices: {:?}", this.choices);
-    let other_comp = rule;
-    
-    this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
-    println!("Propagating to {}, {}, choices: {:?}", x, y, this.choices);
-
-}
-
-
-fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>, 
-    rule: &HashMap<usize, HashMap<Dir, HashSet<usize>>>){
-
-    // print intermediate world
-    // for i in 0..world.len(){
-    //     for j in 0..world[0].len(){
-    //         print!("{:}", world[i][j].kind);
-    //     }
-    //     println!("");
-    // }
-
-    let this = &mut world[y][x];
-
-    if this.collapsed {
-        return;
-    }
-
-    let this_kind = this.collapse_self();
-
-    println!("collapsing tile at {}, {} to kind {:?}", y, x, this_kind);
-
-    let this_rule = rule.get(&this_kind).unwrap();
-
-    println!("this rule: {:?}", this_rule);
-    
-    // Get the tiles in every direction
-    let wrapped_east = this.find_east();
-    let wrapped_west = this.find_west();
-    let wrapped_north = this.find_north();
-    let wrapped_south = this.find_south();
-    
-    if let Some(east) = wrapped_east {
-        let east_rule = this_rule.get(&Dir::EAST).unwrap();
-        println!("East:");
-        propagate(east.0, east.1, east_rule, world);
-    }
-    if let Some(west) = wrapped_west {
-        let west_rule = this_rule.get(&Dir::WEST).unwrap();
-        println!("West:");
-        propagate(west.0, west.1, west_rule, world);
-    }
-    if let Some(north) = wrapped_north{
-        let north_rule = this_rule.get(&Dir::NORTH).unwrap();
-        println!("North:");
-        propagate(north.0, north.1, north_rule, world);
-    }
-    if let Some(south) = wrapped_south{
-        let south_rule = this_rule.get(&Dir::SOUTH).unwrap();
-        println!("South:");
-        propagate(south.0, south.1, south_rule, world);
-    }
-
-}
-
 fn default_choices() -> HashSet<usize>{
     let mut choices = HashSet::new();
     for i in 1..16{
@@ -276,7 +165,7 @@ fn default_choices() -> HashSet<usize>{
     choices
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Tile{
     x: usize,
     y: usize,
@@ -310,6 +199,11 @@ impl Tile{
     }
 
     fn collapse_self(&mut self) -> usize{
+
+        // check if we still have choices left
+        if self.choices.len() == 0{
+            return 0;
+        }
         // Step 1
         let choice = thread_rng().gen_range(0..self.choices.len());
         let state = self.choices.iter().nth(choice).unwrap_or(&0).clone();
@@ -357,3 +251,199 @@ impl Tile{
         }
     }
 }
+
+#[derive(Debug, Clone)]
+struct WorldMap{
+    width: usize,
+    height: usize,
+    world: Vec<Vec<Tile>>,
+    rules: HashMap<usize, HashMap<Dir, HashSet<usize>>>,
+}
+
+impl WorldMap{
+
+    fn new(width: usize, height: usize, rules: HashMap<usize, HashMap<Dir, HashSet<usize>>>) -> WorldMap{
+        let mut world = Vec::new();
+        for i in 0..height{
+            let mut row = Vec::new();
+            for j in 0..width{
+                row.push(Tile::new(j, i, width, height));
+            }
+            world.push(row);
+        }
+        WorldMap{
+            width,
+            height,
+            world,
+            rules,
+        }
+    }
+
+    fn get_tile(&mut self, x: usize, y: usize) -> &Tile{
+        &mut self.world[y][x]
+    }
+
+    fn min_entropy(&self) -> usize{
+        let mut min = usize::MAX;
+        for i in 0..self.height{
+            for j in 0..self.width{
+                let entropy = self.world[i][j].entropy();
+                if entropy < min{
+                    min = entropy;
+                }
+            }
+        }
+        min
+    }
+
+    fn collapse_tile(&mut self) -> bool{
+        /// TODO:
+        /// 1. find a vector of candidate tiles
+        /// 2. choose a tile at random
+        /// 3. collapse the tile, collapse_self() will tell us if it was successful
+        ///   On false, we are backtracking
+        /// 4. propagate to neighbors
+        true
+    }
+
+    fn min_tiles(&mut self) -> Vec<(usize, usize)>{
+        /// TODO:
+        /// call min_entropy
+        /// get a vector
+        /// return the position tuples of our candidates
+    }
+
+    fn propagate(&mut self, x: usize, y: usize){
+        /// TODO:
+        /// get the tile at x, y
+        /// propagate to neighbors
+        /// index into the rules using the tile's kind and direction
+    }
+
+}
+
+//-----------------------------------------------------------------------------------------
+// BELOW ARE FOR REFERENCE 
+
+/// Find the min entropy tile
+// fn min_entropy(world: &Vec<Vec<Tile>>) -> usize {
+//     // loop over the world
+//     let mut min_entropy = usize::MAX;
+//     for row in world.iter() {
+//         for tile in row {
+//             if tile.entropy() < min_entropy && !tile.collapsed {
+//                 min_entropy = tile.entropy();
+//             }
+//         }
+//     }
+
+//     println!("min entropy: {}", min_entropy);
+
+//     min_entropy
+// }
+
+// fn min_tiles(world: &WorldMap) -> Vec<&Tile> {
+//     // Get lowest entropy value
+//     let entropy = world.min_entropy();
+//     // println!("Entropy: {}", entropy);
+//     // ^ This line says entrypy 0, that should not happen.
+//     let _choices: Vec<&Tile> = Vec::new();
+
+//     // Check if it returned a valid value or not
+//     if entropy == usize::MAX {
+//         // No minimum was found, return every single tile
+//         world.world.iter().flat_map(|row| row.iter()).collect()
+//     } else {
+//         let choices = world.world.iter().flat_map(|row| row.iter()).filter(|tile| tile.entropy() == entropy).collect();
+//         println!("Choices: {:?}", choices);
+//         choices
+//     }
+// }
+
+// before we call propagate
+// we already know which neighbor we are prpagating to
+// so we index into the rule set
+// and use that specific rule set
+// fn propagate(x: usize, y: usize, rule: &HashSet<usize>, world: &mut WorldMap){
+
+//     let this_ref = &mut world.get_tile(y, x);
+//     let mut this = this_ref.clone();
+//     println!("this's original choices: {:?}", this.choices);
+//     let other_comp = rule;
+    
+//     this.choices = this.choices.intersection(&other_comp).map(|kind| kind.clone()).collect();
+//     println!("Propagating to {}, {}, choices: {:?}", x, y, this.choices);
+
+// }
+
+
+// fn collapse(world: &mut WorldMap,
+//     rule: &HashMap<usize, HashMap<Dir, HashSet<usize>>>) -> Result<WorldMap, String>{
+
+//     // print intermediate world
+//     // for i in 0..world.len(){
+//     //     for j in 0..world[0].len(){
+//     //         print!("{:}", world[i][j].kind);
+//     //     }
+//     //     println!("");
+//     // }
+//             // Get lowest entropy and collapse on that point
+//     let collapse_options = min_tiles(&world);
+//     // println!("Collapse options: {:?}", collapse_options);
+//     let rand_index = thread_rng().gen_range(0..collapse_options.len());
+//     // println!("Collapse_options len: {}", collapse_options.len());
+//     // println!("Random index: {}", rand_index);
+//     let to_collapse = collapse_options[rand_index];
+
+//     let this_ref = &mut world.get_tile(to_collapse.y, to_collapse.x);
+//     let mut this = this_ref.clone();
+
+//     // No need to return false here, I think
+//     // I actually don't think this is called because I set the entropy to max
+//     // if this.collapsed {
+//     //     return true;
+//     // }
+
+//     // save a copy of the world
+//     let mut world_copy = world.clone();
+
+//     let this_kind = this.collapse_self();
+
+//     if this_kind == 0 {
+//         return Err("No valid choices".to_string());
+//     }
+
+//     let this_rule = rule.get(&this_kind).unwrap();
+
+//     println!("this rule: {:?}", this_rule);
+    
+//     // Get the tiles in every direction
+//     let wrapped_east = this.find_east();
+//     let wrapped_west = this.find_west();
+//     let wrapped_north = this.find_north();
+//     let wrapped_south = this.find_south();
+    
+//     if let Some(east) = wrapped_east {
+//         let east_rule = this_rule.get(&Dir::EAST).unwrap();
+//         println!("East:");
+//         propagate(east.0, east.1, east_rule, world);
+//     }
+//     if let Some(west) = wrapped_west {
+//         let west_rule = this_rule.get(&Dir::WEST).unwrap();
+//         println!("West:");
+//         propagate(west.0, west.1, west_rule, world);
+//     }
+//     if let Some(north) = wrapped_north{
+//         let north_rule = this_rule.get(&Dir::NORTH).unwrap();
+//         println!("North:");
+//         propagate(north.0, north.1, north_rule, world);
+//     }
+//     if let Some(south) = wrapped_south{
+//         let south_rule = this_rule.get(&Dir::SOUTH).unwrap();
+//         println!("South:");
+//         propagate(south.0, south.1, south_rule, world);
+//     }
+
+//     Ok(world_copy)
+
+// }
