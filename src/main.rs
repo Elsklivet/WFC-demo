@@ -22,7 +22,7 @@ fn main() {
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
 
-    println!("content.len() = {}", contents.len());
+    // println!("content.len() = {}", contents.len());
 
     let input_board: Vec<Vec<char>> = contents.lines().map(|l| l.chars().collect()).collect();
     println!("input_board.len() = {}", input_board.len());
@@ -57,7 +57,7 @@ fn main() {
     for i in 0..input_board.len() {
         for j in 0..input_board[i].len() {
             let c = input_board[i][j];
-            print!("{:?}-", charmap.get(&c).unwrap());
+            print!("{:?} ", charmap.get(&c).unwrap());
         }
         println!("");
     }
@@ -91,21 +91,21 @@ fn main() {
     // now go through the map and fill in the rules
     for i in 0..map.len(){
         for j in 0..map[i].len(){
-            // North
-            if i > 0{
-                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::NORTH).unwrap().insert(map[i-1][j]);
-            }
-            // South
-            if i < 9{
-                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::SOUTH).unwrap().insert(map[i+1][j]);
-            }
             // West
-            if j > 0{
-                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::WEST).unwrap().insert(map[i][j-1]);
+            if i > 0{
+                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::WEST).unwrap().insert(map[i-1][j]);
             }
             // East
+            if i < 9{
+                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::EAST).unwrap().insert(map[i+1][j]);
+            }
+            // North
+            if j > 0{
+                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::NORTH).unwrap().insert(map[i][j-1]);
+            }
+            // South
             if j < 9{
-                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::EAST).unwrap().insert(map[i][j+1]);
+                rules.get_mut(&map[i][j]).unwrap().get_mut(&Dir::SOUTH).unwrap().insert(map[i][j+1]);
             }
         }
     }
@@ -114,10 +114,10 @@ fn main() {
     let world_height = args[2].parse::<usize>().unwrap();
 
     let mut world: Vec<Vec<Tile>> = Vec::new();
-    for i in 0..world_height{
+    for y in 0..world_height{
         let mut row: Vec<Tile> = Vec::new();
-        for j in 0..world_width{
-            row.push(Tile::new(i, j, world_width, world_height));
+        for x in 0..world_width{
+            row.push(Tile::new(x, y, world_width, world_height));
         }
         world.push(row);
     }
