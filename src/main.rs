@@ -270,7 +270,7 @@ fn collapse(x: usize, y: usize, world: &mut Vec<Vec<Tile>>,
 
 fn default_choices() -> HashSet<usize>{
     let mut choices = HashSet::new();
-    for i in 1..=16{
+    for i in 1..16{
         choices.insert(i);
     }
     choices
